@@ -15,6 +15,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { translations } from '../translations';
+import { speakFluentText, stopSpeech } from '../utils/speechService';
 
 export default function FarmerHelpGuide({ language }) {
   const t = translations[language];
@@ -22,43 +23,36 @@ export default function FarmerHelpGuide({ language }) {
 
   useEffect(() => {
     return () => {
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
+      stopSpeech();
     };
   }, []);
 
   const handleSpeakGuide = () => {
-    if (!('speechSynthesis' in window)) {
-      alert('Text to speech not supported in this browser.');
-      return;
-    }
-
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
+      stopSpeech();
       setIsSpeaking(false);
       return;
     }
 
     let speechText = '';
-    let voiceLang = language === 'hi' ? 'hi-IN' : 'en-US';
+    const isHindi = language === 'hi';
+    const voiceLang = isHindi ? 'hi-IN' : 'en-US';
 
-    if (language === 'hi') {
-      speechText = `गौ-रक्षक एआई किसान गाइड में आपका स्वागत है। थनैल रोग की 3 मुख्य स्थितियां होती हैं: पहला हरा रंग यानी स्वस्थ थन। दूध सुरक्षित है और सामान्य रूप से दोहा जा सकता है। दूसरा पीला रंग यानी हल्का संक्रमण या शुरुआती थनैल। इस दूध को अलग बर्तन में निकालें और पशु चिकित्सक को दिखाएं। तीसरा लाल रंग यानी गंभीर थनैल रोग। इस दूध का उपयोग बिल्कुल न करें, गाय को अलग बाड़े में रखें और तुरंत डॉक्टर से एंटीबायोटिक उपचार कराएं।`;
+    if (isHindi) {
+      speechText = `गौ-रक्षक एआई किसान गाइड में आपका स्वागत है। थनैल रोग की तीन मुख्य स्थितियां होती हैं: पहला हरा रंग यानी स्वस्थ थन। दूध पूरी तरह सुरक्षित है और सामान्य रूप से दोहा जा सकता है। दूसरा पीला रंग यानी हल्का संक्रमण या शुरुआती थनैल। इस दूध को अलग बर्तन में निकालें और पशु चिकित्सक को दिखाएं। तीसरा लाल रंग यानी गंभीर थनैल रोग। इस दूध का उपयोग बिल्कुल न करें, गाय को अलग बाड़े में रखें और तुरंत डॉक्टर से एंटीबायोटिक उपचार कराएं।`;
     } else {
       speechText = `Welcome to the GauRakshak AI Farmer Guide. Mastitis has three color-coded stages: Green means Healthy Udder, milk is 100 percent pure and safe. Yellow means Mild Early Mastitis, milk from this quarter should be isolated and evaluated by your local vet. Red means Severe Clinical Mastitis, immediately stop using this milk, isolate the cow, and call your veterinarian for urgent clinical treatment.`;
     }
 
-    const utterance = new SpeechSynthesisUtterance(speechText);
-    utterance.lang = voiceLang;
-    utterance.rate = 0.95;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    speakFluentText({
+      text: speechText,
+      lang: voiceLang,
+      rate: isHindi ? 0.88 : 0.90,
+      pitch: 1.0,
+      onStart: () => setIsSpeaking(true),
+      onEnd: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false)
+    });
   };
 
   return (

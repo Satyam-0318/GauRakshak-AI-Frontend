@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { translations } from '../translations';
 import { API_BASE_URL } from '../constants';
+import { speakCowDiagnosis, speakCowProfileSummary, stopSpeech } from '../utils/speechService';
 
 export default function RfidPredictionFlow({ 
   language, 
@@ -82,9 +83,7 @@ export default function RfidPredictionFlow({
   // Clean up speech on unmount
   useEffect(() => {
     return () => {
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
+      stopSpeech();
     };
   }, []);
 
@@ -154,10 +153,8 @@ export default function RfidPredictionFlow({
   const handleRunPrediction = async () => {
     setLoading(true);
     setError(null);
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-    }
+    stopSpeech();
+    setIsSpeaking(false);
 
     try {
       const payload = {
@@ -195,56 +192,41 @@ export default function RfidPredictionFlow({
     }
   };
 
-  // Text-to-Speech Audio Playback
+  // Text-to-Speech Audio Playback for Diagnosis Result
   const handlePlayAudio = () => {
-    if (!('speechSynthesis' in window)) {
-      alert('Text to speech is not supported in this browser.');
-      return;
-    }
-
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
+      stopSpeech();
       setIsSpeaking(false);
       return;
     }
 
-    const cowName = selectedCow?.name || rfid;
-    const stage = predictionResult?.predicted_stage || 'Healthy';
+    speakCowDiagnosis({
+      cowName: selectedCow?.name,
+      rfid,
+      stage: predictionResult?.predicted_stage || 'Healthy',
+      language,
+      onStart: () => setIsSpeaking(true),
+      onEnd: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false)
+    });
+  };
 
-    let speechText = '';
-    let voiceLang = 'en-US';
-
-    if (language === 'hi') {
-      voiceLang = 'hi-IN';
-      if (stage === 'Healthy') {
-        speechText = `गाय ${cowName}, आर एफ आई डी ${rfid} का परिणाम: स्वस्थ थन। दूध पूरी तरह सुरक्षित है। कोई संक्रमण नहीं पाया गया है। सामान्य दुग्ध दोहन जारी रखें।`;
-      } else if (stage === 'Subclinical') {
-        speechText = `सावधानी! गाय ${cowName}, आर एफ आई डी ${rfid} में हल्का थनैल संक्रमण पाया गया है। दूध में सोमैटिक सेल और चालकता बढ़ रही है। कृपया स्थानीय पशु चिकित्सक को दिखाएं और थन का सीएमटी परीक्षण करें।`;
-      } else {
-        speechText = `आपातकालीन चेतावनी! गाय ${cowName}, आर एफ आई डी ${rfid} में गंभीर थनैल रोग पाया गया है। इस गाय को तुरंत अन्य गायों से अलग करें। इस दूध का उपयोग न करें और तुरंत पशु चिकित्सक से संपर्क करें।`;
-      }
-    } else {
-      voiceLang = 'en-US';
-      if (stage === 'Healthy') {
-        speechText = `Cow ${cowName}, RFID ${rfid} test result: Healthy udder. Milk is completely pure and safe. Continue regular milking hygiene.`;
-      } else if (stage === 'Subclinical') {
-        speechText = `Caution! Cow ${cowName}, RFID ${rfid} shows mild early mastitis infection. Somatic cell count and conductivity are elevated. Please consult your dairy veterinarian soon.`;
-      } else {
-        speechText = `Urgent alert! Cow ${cowName}, RFID ${rfid} is diagnosed with clinical mastitis. Isolate this cow immediately, do not mix milk in bulk tank, and contact your veterinarian for urgent treatment.`;
-      }
+  // Speak Cow Summary in Step 1
+  const handleSpeakCowSummary = () => {
+    if (!selectedCow) return;
+    if (isSpeaking) {
+      stopSpeech();
+      setIsSpeaking(false);
+      return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(speechText);
-    utterance.lang = voiceLang;
-    utterance.rate = 0.95; // Slightly slower for clear rural comprehension
-    utterance.pitch = 1.0;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    speakCowProfileSummary({
+      cow: selectedCow,
+      language,
+      onStart: () => setIsSpeaking(true),
+      onEnd: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false)
+    });
   };
 
   // Helper formatting
@@ -373,17 +355,33 @@ export default function RfidPredictionFlow({
               </div>
             </div>
 
-            {onViewCowProfile && (
+            <div className="flex items-center space-x-2 flex-wrap gap-y-2">
               <button
                 type="button"
-                onClick={() => onViewCowProfile(selectedCow.rfid)}
-                className="min-h-[48px] px-4 py-2 rounded-xl text-xs font-bold bg-white text-emerald-900 border border-emerald-300 hover:bg-emerald-50 transition-all flex items-center space-x-1.5 shadow-2xs"
+                onClick={handleSpeakCowSummary}
+                className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-2xs cursor-pointer ${
+                  isSpeaking
+                    ? 'bg-rose-600 text-white animate-pulse'
+                    : 'bg-white text-emerald-900 border border-emerald-300 hover:bg-emerald-50'
+                }`}
+                title={language === 'en' ? 'Listen to cow summary' : 'गाय की जानकारी आवाज़ में सुनें'}
               >
-                <History className="h-3.5 w-3.5" />
-                <span>{t.viewCowProfile}</span>
-                <ChevronRight className="h-3.5 w-3.5" />
+                {isSpeaking ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4 text-emerald-700" />}
+                <span>{isSpeaking ? t.stopSpeaking : (language === 'en' ? 'Listen Info' : 'जानकारी सुनें')}</span>
               </button>
-            )}
+
+              {onViewCowProfile && (
+                <button
+                  type="button"
+                  onClick={() => onViewCowProfile(selectedCow.rfid)}
+                  className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold bg-white text-emerald-900 border border-emerald-300 hover:bg-emerald-50 transition-all flex items-center space-x-1.5 shadow-2xs cursor-pointer"
+                >
+                  <History className="h-3.5 w-3.5" />
+                  <span>{t.viewCowProfile}</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         ) : isNewCow && rfid.trim() ? (
           <div className="bg-[#fff9ea] rounded-2xl p-4 sm:p-5 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

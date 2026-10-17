@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle, 
   AlertTriangle, 
@@ -10,7 +10,9 @@ import {
   ShieldCheck,
   ChevronRight,
   TrendingUp,
-  Thermometer
+  Thermometer,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -27,6 +29,7 @@ import {
   API_BASE_URL 
 } from '../constants';
 import { translations } from '../translations';
+import { speakCowDiagnosis, stopSpeech } from '../utils/speechService';
 
 export default function SingleDiagnosis({ language }) {
   const t = translations[language];
@@ -45,6 +48,13 @@ export default function SingleDiagnosis({ language }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      stopSpeech();
+    };
+  }, []);
 
   // Categorical Options based on language
   const categoricalOptions = {
@@ -122,6 +132,8 @@ export default function SingleDiagnosis({ language }) {
 
     setLoading(true);
     setError(null);
+    stopSpeech();
+    setIsSpeaking(false);
 
     try {
       const payload = {
@@ -155,6 +167,25 @@ export default function SingleDiagnosis({ language }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePlayDiagnosisAudio = () => {
+    if (!result) return;
+    if (isSpeaking) {
+      stopSpeech();
+      setIsSpeaking(false);
+      return;
+    }
+
+    speakCowDiagnosis({
+      cowName: language === 'hi' ? 'गौमाता' : 'Cow',
+      rfid: 'SINGLE-TEST',
+      stage: result.predicted_stage || 'Healthy',
+      language,
+      onStart: () => setIsSpeaking(true),
+      onEnd: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false)
+    });
   };
 
   const handleReset = () => {
@@ -603,12 +634,28 @@ export default function SingleDiagnosis({ language }) {
                     </div>
                   </div>
 
-                  {/* Confidence Badge */}
-                  <div className="text-right sm:border-l sm:border-slate-200 sm:pl-4">
-                    <span className="text-[11px] font-medium text-slate-500 block">{t.modelConfidence}</span>
-                    <span className="text-2xl font-black text-slate-900 font-mono">
-                      {(result.confidence * 100).toFixed(1)}%
-                    </span>
+                  {/* Audio Playback & Confidence Badge */}
+                  <div className="flex items-center space-x-3 sm:border-l sm:border-slate-200 sm:pl-4">
+                    <button
+                      type="button"
+                      onClick={handlePlayDiagnosisAudio}
+                      className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-2xs cursor-pointer ${
+                        isSpeaking
+                          ? 'bg-rose-600 text-white animate-pulse'
+                          : 'bg-white text-slate-800 border border-slate-300 hover:bg-slate-50'
+                      }`}
+                      title={language === 'en' ? 'Listen to diagnostic result' : 'जांच परिणाम आवाज़ में सुनें'}
+                    >
+                      {isSpeaking ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4 text-blue-600" />}
+                      <span>{isSpeaking ? t.stopSpeaking : t.tapToHear}</span>
+                    </button>
+
+                    <div className="text-right">
+                      <span className="text-[11px] font-medium text-slate-500 block">{t.modelConfidence}</span>
+                      <span className="text-2xl font-black text-slate-900 font-mono">
+                        {(result.confidence * 100).toFixed(1)}%
+                      </span>
+                    </div>
                   </div>
                 </div>
 

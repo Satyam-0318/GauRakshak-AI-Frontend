@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { translations } from '../translations';
 import { API_BASE_URL } from '../constants';
+import { speakCowHistoryRecord, speakCowProfileSummary, stopSpeech } from '../utils/speechService';
 
 export default function CowProfileView({ 
   language, 
@@ -49,6 +50,7 @@ export default function CowProfileView({
 
   // Audio Playback for past record
   const [playingRecordId, setPlayingRecordId] = useState(null);
+  const [isSpeakingSummary, setIsSpeakingSummary] = useState(false);
 
   useEffect(() => {
     loadAllCows();
@@ -63,9 +65,7 @@ export default function CowProfileView({
   // Clean up audio on unmount
   useEffect(() => {
     return () => {
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
+      stopSpeech();
     };
   }, []);
 
@@ -118,50 +118,40 @@ export default function CowProfileView({
   };
 
   const handleSpeakHistoryItem = (record) => {
-    if (!('speechSynthesis' in window)) {
-      alert('Text to speech is not supported in this browser.');
-      return;
-    }
-
     if (playingRecordId === record.id) {
-      window.speechSynthesis.cancel();
+      stopSpeech();
       setPlayingRecordId(null);
       return;
     }
 
-    const cowName = cowDetail?.name || selectedRfid;
-    const stage = record.predicted_stage;
-    let text = '';
-    let langCode = language === 'hi' ? 'hi-IN' : 'en-US';
+    setPlayingRecordId(record.id);
+    speakCowHistoryRecord({
+      cowName: cowDetail?.name,
+      rfid: selectedRfid,
+      record,
+      language,
+      onStart: () => setPlayingRecordId(record.id),
+      onEnd: () => setPlayingRecordId(null),
+      onError: () => setPlayingRecordId(null)
+    });
+  };
 
-    if (language === 'hi') {
-      if (stage === 'Healthy') {
-        text = `गाय ${cowName}, तारीख ${record.timestamp}: स्वस्थ थन। दूध सुरक्षित था।`;
-      } else if (stage === 'Subclinical') {
-        text = `गाय ${cowName}, तारीख ${record.timestamp}: हल्का थनैल संक्रमण। सोमैटिक सेल बढ़े हुए थे।`;
-      } else {
-        text = `गाय ${cowName}, तारीख ${record.timestamp}: गंभीर थनैल रोग पाया गया था। तुरंत उपचार की आवश्यकता थी।`;
-      }
-    } else {
-      if (stage === 'Healthy') {
-        text = `Record for Cow ${cowName} on ${record.timestamp}: Healthy udder, milk safe.`;
-      } else if (stage === 'Subclinical') {
-        text = `Record for Cow ${cowName} on ${record.timestamp}: Caution, mild mastitis infection detected.`;
-      } else {
-        text = `Record for Cow ${cowName} on ${record.timestamp}: Urgent clinical mastitis detected.`;
-      }
+  const handleSpeakProfileSummary = () => {
+    if (!cowDetail) return;
+    if (isSpeakingSummary) {
+      stopSpeech();
+      setIsSpeakingSummary(false);
+      return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = langCode;
-    utterance.rate = 0.95;
-
-    utterance.onstart = () => setPlayingRecordId(record.id);
-    utterance.onend = () => setPlayingRecordId(null);
-    utterance.onerror = () => setPlayingRecordId(null);
-
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    setIsSpeakingSummary(true);
+    speakCowProfileSummary({
+      cow: cowDetail,
+      language,
+      onStart: () => setIsSpeakingSummary(true),
+      onEnd: () => setIsSpeakingSummary(false),
+      onError: () => setIsSpeakingSummary(false)
+    });
   };
 
   // Filter cows
@@ -365,7 +355,21 @@ export default function CowProfileView({
               </div>
 
               {/* Action Buttons */}
-              <div className="relative z-10 flex items-center space-x-3 w-full md:w-auto">
+              <div className="relative z-10 flex items-center space-x-3 w-full md:w-auto flex-wrap gap-y-2">
+                <button
+                  type="button"
+                  onClick={handleSpeakProfileSummary}
+                  className={`flex-1 md:flex-initial min-h-[48px] px-5 py-3 rounded-2xl text-xs font-black transition-all flex items-center justify-center space-x-2 shadow-lg active:scale-95 cursor-pointer ${
+                    isSpeakingSummary
+                      ? 'bg-rose-600 text-white animate-pulse'
+                      : 'bg-white/10 hover:bg-white/20 text-[#faecc4] border border-[#faecc4]/30'
+                  }`}
+                  title={language === 'en' ? 'Listen to cow summary' : 'गाय का स्वास्थ्य सारांश आवाज़ में सुनें'}
+                >
+                  {isSpeakingSummary ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4 text-[#faecc4]" />}
+                  <span>{isSpeakingSummary ? t.stopSpeaking : (language === 'en' ? 'Listen Summary' : 'सारांश सुनें')}</span>
+                </button>
+
                 {onStartPredictionForCow && (
                   <button
                     type="button"
@@ -529,14 +533,30 @@ export default function CowProfileView({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-xl text-[#faecc4]/70 hover:text-white hover:bg-[#164a2b] transition-colors cursor-pointer"
-                title="Close Modal"
-              >
-                <X className="h-6 w-6" />
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={handleSpeakProfileSummary}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                    isSpeakingSummary
+                      ? 'bg-rose-600 text-white animate-pulse'
+                      : 'bg-white/10 hover:bg-white/20 text-[#faecc4] border border-[#faecc4]/30'
+                  }`}
+                  title={language === 'en' ? 'Listen to cow summary' : 'गाय का स्वास्थ्य सारांश आवाज़ में सुनें'}
+                >
+                  {isSpeakingSummary ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5 text-[#faecc4]" />}
+                  <span className="hidden sm:inline">{isSpeakingSummary ? t.stopSpeaking : (language === 'en' ? 'Listen Summary' : 'सारांश सुनें')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2 rounded-xl text-[#faecc4]/70 hover:text-white hover:bg-[#164a2b] transition-colors cursor-pointer"
+                  title="Close Modal"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body: Test History Timeline */}
