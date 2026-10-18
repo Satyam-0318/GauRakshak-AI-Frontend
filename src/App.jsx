@@ -7,7 +7,6 @@ import CowProfileView from './components/CowProfileView';
 import FarmerHelpGuide from './components/FarmerHelpGuide';
 import HistoryAndGuideView from './components/HistoryAndGuideView';
 import DashboardView from './components/DashboardView';
-import ModelMetrics from './components/ModelMetrics';
 import ParameterDrawer from './components/ParameterDrawer';
 import Footer from './components/Footer';
 import { API_BASE_URL } from './constants';
@@ -321,11 +320,6 @@ export default function App() {
               onSelectCowPreset={handleSelectCowPreset}
               onOpenParameterDrawer={() => setIsDrawerOpen(true)}
             />
-          )}
-
-
-          {currentTab === 'reports' && (
-            <ModelMetrics language={language} />
           )}
 
           {currentTab === 'settings' && (

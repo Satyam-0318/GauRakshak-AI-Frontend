@@ -6,7 +6,6 @@ import {
   HelpCircle,
   LayoutDashboard, 
   Layers, 
-  BarChart3, 
   Settings, 
   ArrowLeft,
   Cpu,
@@ -24,9 +23,8 @@ export default function Sidebar({ currentTab, setCurrentTab, onReturnToLanding, 
     { id: 'help', label: t.navHelp, icon: HelpCircle },
   ];
 
-  // Secondary Tools (Available for audit in Task 4)
+  // Secondary Tools
   const secondaryMenuItems = [
-    { id: 'reports', label: language === 'en' ? 'Model Specs' : 'मॉडल स्पेक्स', icon: BarChart3 },
     { id: 'dashboard', label: language === 'en' ? 'Parlor Telemetry' : 'पार्लर टेलीमेट्री', icon: LayoutDashboard },
   ];
 
